@@ -1,4 +1,5 @@
 ﻿#region Copyright
+
 // ****************************************************************************
 // <copyright file="Constants.cs">
 // Copyright © Vyacheslav Volkov 2012-2014
@@ -12,12 +13,19 @@
 // See license.txt in this solution or http://mugenmvvmtoolkit.codeplex.com/license
 // </license>
 // ****************************************************************************
+
 #endregion
 
 namespace MugenMvvmToolkit.Fody
 {
     public static class Constants
     {
+        public const string MugenMvvmToolkitAssemblyName = "MugenMvvmToolkit";
+
+        public const string AsyncStateMachineAwareFullName = "MugenMvvmToolkit.Interfaces.Callbacks.IAsyncStateMachineAware";
+
         public const string AsyncStateMachineIntefaceFullName = "System.Runtime.CompilerServices.IAsyncStateMachine";
+
+        public const string SetStateMachineMethodName = "SetStateMachine";
     }
 }

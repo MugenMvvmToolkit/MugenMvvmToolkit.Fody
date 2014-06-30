@@ -25,6 +25,13 @@ namespace MugenMvvmToolkit.Fody
 {
     public sealed class ModuleWeaver
     {
+        #region Fields
+
+        private TypeReference _asyncStateMachineAwareType;
+        private MethodReference _setStateMachineMethod;
+
+        #endregion
+
         #region Constructors
 
         /// <summary>
@@ -45,12 +52,31 @@ namespace MugenMvvmToolkit.Fody
         // An instance of Mono.Cecil.ModuleDefinition for processing
         public ModuleDefinition ModuleDefinition { get; set; }
 
+        public IAssemblyResolver AssemblyResolver { get; set; }
+
         #endregion
 
         #region Methods
 
         public void Execute()
         {
+            var definition = AssemblyResolver.Resolve(Constants.MugenMvvmToolkitAssemblyName);
+            if (definition == null)
+                return;
+            TypeReference type = definition.MainModule.Types.FirstOrDefault(typeDefinition => typeDefinition.FullName == Constants.AsyncStateMachineAwareFullName);
+            if (type == null)
+                return;
+            var resolveType = type.Resolve();
+            if (resolveType == null)
+                return;
+            _asyncStateMachineAwareType = ModuleDefinition.Import(type);
+            var setStateMachineMethod = resolveType.Methods
+                .FirstOrDefault(method => method.Name == Constants.SetStateMachineMethodName && method.Parameters.Count == 1 &&
+                          method.Parameters[0].ParameterType.FullName == Constants.AsyncStateMachineIntefaceFullName);
+            if (setStateMachineMethod == null)
+                return;
+            _setStateMachineMethod = ModuleDefinition.Import(setStateMachineMethod);
+
             var types = new List<TypeDefinition>();
             CollectAsyncStateMachine(ModuleDefinition.Types, types);
             foreach (var typeDefinition in types)
@@ -60,53 +86,35 @@ namespace MugenMvvmToolkit.Fody
 
         private void TryUpdateMethod(MethodDefinition method)
         {
-            method.Body.SimplifyMacros();
-
-            var instructions = method.Body.Instructions;
-            for (var index = 0; index < instructions.Count; index++)
+            if (method.Name != Constants.SetStateMachineMethodName || method.Parameters.Count != 1 ||
+                method.Parameters[0].ParameterType.FullName != Constants.AsyncStateMachineIntefaceFullName)
+                return;
+            var field = method.DeclaringType.Fields.FirstOrDefault(definition => definition.Name.Contains("$awaiter"));
+            if (field == null || field.FieldType.IsValueType)
             {
-                var line = instructions[index];
-                if (line.OpCode != OpCodes.Call)
-                    continue;
-
-                var oldMethod = line.Operand as MethodReference;
-                if (oldMethod == null)
-                    continue;
-                MethodReference newMethod = oldMethod
-                    .DeclaringType
-                    .Resolve()
-                    .GetMethods()
-                    .FirstOrDefault(definition => definition.Name == oldMethod.Name && definition.Parameters.Count == 2 &&
-                                      definition.Parameters[1].ParameterType.FullName == Constants.AsyncStateMachineIntefaceFullName &&
-                                      definition.HasGenericParameters == oldMethod.IsGenericInstance);
-                if (newMethod == null)
-                    continue;
-                if (newMethod.HasGenericParameters)
-                {
-                    var genericInstance = (IGenericInstance)oldMethod;
-                    if (genericInstance.GenericArguments.Count != newMethod.GenericParameters.Count)
-                        continue;
-                    var genericMethod = new GenericInstanceMethod(newMethod);
-                    foreach (var argument in genericInstance.GenericArguments)
-                        genericMethod.GenericArguments.Add(argument);
-                    newMethod = genericMethod;
-                }
-
-                instructions.RemoveAt(index);
-                instructions.Insert(index, Instruction.Create(OpCodes.Ldarg_0));
-                index++;
-                if (method.DeclaringType.IsValueType)
-                {
-                    instructions.Insert(index, Instruction.Create(OpCodes.Ldobj, method.DeclaringType));
-                    index++;
-                    instructions.Insert(index, Instruction.Create(OpCodes.Box, method.DeclaringType));
-                    index++;
-                }
-                instructions.Insert(index, Instruction.Create(OpCodes.Call, newMethod));
-                index++;
-                LogInfo(string.Format("AsyncStateMachine {0} was updated", method.DeclaringType.Name));
+                LogInfo(string.Format("The awaiter field was not found or it's a value type {0}", field));
+                return;
             }
+
+            method.Body.SimplifyMacros();
+            var variable = new VariableDefinition(_asyncStateMachineAwareType);
+            method.Body.Variables.Add(variable);
+            var instructions = method.Body.Instructions;
+            var index = instructions.Count - 1;
+            var returnInst = instructions[index];
+            instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
+            instructions.Insert(index++, Instruction.Create(OpCodes.Ldfld, field));
+            instructions.Insert(index++, Instruction.Create(OpCodes.Isinst, _asyncStateMachineAwareType));
+            instructions.Insert(index++, Instruction.Create(OpCodes.Stloc, variable));
+            instructions.Insert(index++, Instruction.Create(OpCodes.Ldloc, variable));
+            instructions.Insert(index++, Instruction.Create(OpCodes.Brfalse_S, returnInst));
+
+            instructions.Insert(index++, Instruction.Create(OpCodes.Ldloc, variable));
+            instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_1));
+            instructions.Insert(index, Instruction.Create(OpCodes.Callvirt, _setStateMachineMethod));
+
             method.Body.OptimizeMacros();
+            LogInfo(string.Format("AsyncStateMachine {0} was updated", method.DeclaringType.Name));
         }
 
         private static void CollectAsyncStateMachine(IEnumerable<TypeDefinition> typeDefinitions, List<TypeDefinition> types)

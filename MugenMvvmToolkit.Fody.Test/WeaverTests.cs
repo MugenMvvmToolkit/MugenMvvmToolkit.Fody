@@ -38,12 +38,14 @@ namespace MugenMvvmToolkit.Fody.Test
             ModuleDefinition moduleDefinition = ModuleDefinition.ReadModule(_newAssemblyPath);
             var weavingTask = new ModuleWeaver
             {
-                ModuleDefinition = moduleDefinition
+                ModuleDefinition = moduleDefinition,
+                AssemblyResolver = new DefaultAssemblyResolver(),
+                LogInfo = s => Console.WriteLine(s)
             };
 
             weavingTask.Execute();
             moduleDefinition.Write(_newAssemblyPath);
-
+             	
             _assembly = Assembly.LoadFile(_newAssemblyPath);
         }
 
@@ -57,14 +59,6 @@ namespace MugenMvvmToolkit.Fody.Test
             instance.Run(resetEvent);
             resetEvent.WaitOne(1000);
         }
-
-#if DEBUG
-        [TestMethod]
-        public void PeVerify()
-        {
-            Verifier.Verify(_assemblyPath, _newAssemblyPath);
-        }
-#endif
 
         #endregion
     }
