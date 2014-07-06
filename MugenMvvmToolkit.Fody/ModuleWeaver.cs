@@ -40,16 +40,17 @@ namespace MugenMvvmToolkit.Fody
         public ModuleWeaver()
         {
             LogInfo = s => { };
+            LogWarning = s => { };
         }
 
         #endregion
 
         #region Properties
 
-        // Will log an informational message to MSBuild
         public Action<string> LogInfo { get; set; }
 
-        // An instance of Mono.Cecil.ModuleDefinition for processing
+        public Action<string> LogWarning { get; set; }
+        
         public ModuleDefinition ModuleDefinition { get; set; }
 
         public IAssemblyResolver AssemblyResolver { get; set; }
@@ -62,19 +63,32 @@ namespace MugenMvvmToolkit.Fody
         {
             var definition = AssemblyResolver.Resolve(Constants.MugenMvvmToolkitAssemblyName);
             if (definition == null)
+            {
+                LogWarning(string.Format("The {0} is not referenced to a project {1}",
+                    Constants.MugenMvvmToolkitAssemblyName, ModuleDefinition.Name));
                 return;
+            }
             TypeReference type = definition.MainModule.Types.FirstOrDefault(typeDefinition => typeDefinition.FullName == Constants.AsyncStateMachineAwareFullName);
             if (type == null)
+            {
+                LogWarning(string.Format("The type {0} was not found", Constants.AsyncStateMachineAwareFullName));
                 return;
+            }
             var resolveType = type.Resolve();
             if (resolveType == null)
+            {
+                LogWarning(string.Format("The type {0} was not found", Constants.AsyncStateMachineAwareFullName));
                 return;
+            }
             _asyncStateMachineAwareType = ModuleDefinition.Import(type);
             var setStateMachineMethod = resolveType.Methods
                 .FirstOrDefault(method => method.Name == Constants.SetStateMachineMethodName && method.Parameters.Count == 1 &&
                           method.Parameters[0].ParameterType.FullName == Constants.AsyncStateMachineIntefaceFullName);
             if (setStateMachineMethod == null)
+            {
+                LogWarning(string.Format("The method {0} was not found", Constants.AsyncStateMachineIntefaceFullName));
                 return;
+            }
             _setStateMachineMethod = ModuleDefinition.Import(setStateMachineMethod);
 
             var types = new List<TypeDefinition>();
@@ -92,7 +106,8 @@ namespace MugenMvvmToolkit.Fody
             var field = method.DeclaringType.Fields.FirstOrDefault(definition => definition.Name.Contains("$awaiter"));
             if (field == null || field.FieldType.IsValueType)
             {
-                LogInfo(string.Format("The awaiter field was not found or it's a value type {0}", field));
+                LogInfo(string.Format("The awaiter field was not found on type '{0}' or it's a value type '{1}'",
+                    method.DeclaringType, field));
                 return;
             }
 

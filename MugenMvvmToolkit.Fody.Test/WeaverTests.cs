@@ -40,20 +40,21 @@ namespace MugenMvvmToolkit.Fody.Test
             {
                 ModuleDefinition = moduleDefinition,
                 AssemblyResolver = new DefaultAssemblyResolver(),
-                LogInfo = s => Console.WriteLine(s)
+                LogInfo = s => Console.WriteLine(s),
+                LogWarning = s => Console.WriteLine(s)
             };
 
             weavingTask.Execute();
             moduleDefinition.Write(_newAssemblyPath);
-             	
+
             _assembly = Assembly.LoadFile(_newAssemblyPath);
         }
 
         [TestMethod]
         public void ValidateAsyncMethods()
         {
-            Type type = _assembly.GetType(typeof (TestClass).FullName);
-            var instance = (dynamic) Activator.CreateInstance(type);
+            Type type = _assembly.GetType(typeof(TestClass).FullName);
+            var instance = (dynamic)Activator.CreateInstance(type);
 
             var resetEvent = new ManualResetEvent(false);
             instance.Run(resetEvent);
