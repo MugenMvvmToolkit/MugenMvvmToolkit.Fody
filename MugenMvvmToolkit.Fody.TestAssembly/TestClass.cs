@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using MugenMvvmToolkit.Infrastructure.Callbacks;
 using MugenMvvmToolkit.Interfaces.Callbacks;
+using MugenMvvmToolkit.Utils;
 
 namespace MugenMvvmToolkit.Fody.TestAssembly
 {
@@ -25,6 +26,8 @@ namespace MugenMvvmToolkit.Fody.TestAssembly
             await AsyncMethodGeneric();
             await AsyncMugenAwaiterMethod();
             await AsyncMugenAwaiterMethodGeneric();
+            await DoubleAsyncMugenAwaiterMethod();
+            await DoubleAsyncMugenAwaiterMethod();
             if (CustomAwaiter.Awaiters.Count == 0)
                 throw new InvalidOperationException("The Awaiters collection is empty");
             foreach (CustomAwaiter customAwaiter in CustomAwaiter.Awaiters)
@@ -57,6 +60,33 @@ namespace MugenMvvmToolkit.Fody.TestAssembly
         {
             IAsyncOperation<bool> operation = new AsyncOperation<bool>();
             return await operation;
+        }
+
+        private async Task DoubleAsyncMugenAwaiterMethod()
+        {
+            var b = await new Func<bool>(() => true) || await MvvmUtils.TrueTaskResult;
+            if (b)
+            {
+                IAsyncOperation<bool> operation1 = new AsyncOperation<bool>();
+                await operation1;
+            }
+
+            IAsyncOperation<bool> operation2 = new AsyncOperation<bool>();
+            await operation2;
+        }
+
+        private async Task<bool> DoubleAsyncMugenAwaiterMethodGeneric()
+        {
+            var b = await new Func<bool>(() => true) || await MvvmUtils.TrueTaskResult;
+            bool result = false;
+            if (b)
+            {
+                IAsyncOperation<bool> operation1 = new AsyncOperation<bool>();
+                result = await operation1;
+            }
+
+            IAsyncOperation<bool> operation2 = new AsyncOperation<bool>();
+            return await operation2 || result;
         }
 
         #endregion

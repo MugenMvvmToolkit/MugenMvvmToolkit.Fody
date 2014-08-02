@@ -50,7 +50,7 @@ namespace MugenMvvmToolkit.Fody
         public Action<string> LogInfo { get; set; }
 
         public Action<string> LogWarning { get; set; }
-        
+
         public ModuleDefinition ModuleDefinition { get; set; }
 
         public IAssemblyResolver AssemblyResolver { get; set; }
@@ -103,14 +103,19 @@ namespace MugenMvvmToolkit.Fody
             if (method.Name != Constants.SetStateMachineMethodName || method.Parameters.Count != 1 ||
                 method.Parameters[0].ParameterType.FullName != Constants.AsyncStateMachineIntefaceFullName)
                 return;
-            var field = method.DeclaringType.Fields.FirstOrDefault(definition => definition.Name.Contains("$awaiter"));
-            if (field == null || field.FieldType.IsValueType)
+            foreach (var field in method.DeclaringType.Fields.Where(definition => definition.Name.Contains("$awaiter")))
             {
-                LogInfo(string.Format("The awaiter field was not found on type '{0}' or it's a value type '{1}'",
-                    method.DeclaringType, field));
-                return;
-            }
 
+                if (field.FieldType.IsValueType)
+                    LogInfo(string.Format("The awaiter field on type '{0}' is a value type '{1}'", method.DeclaringType,
+                        field));
+                else
+                    UpdateStateMachine(method, field);
+            }
+        }
+
+        private void UpdateStateMachine(MethodDefinition method, FieldDefinition field)
+        {
             method.Body.SimplifyMacros();
             var variable = new VariableDefinition(_asyncStateMachineAwareType);
             method.Body.Variables.Add(variable);
