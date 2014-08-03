@@ -27,7 +27,7 @@ namespace MugenMvvmToolkit.Fody.TestAssembly
             await AsyncMugenAwaiterMethod();
             await AsyncMugenAwaiterMethodGeneric();
             await DoubleAsyncMugenAwaiterMethod();
-            await DoubleAsyncMugenAwaiterMethod();
+            await DoubleAsyncMugenAwaiterMethodGeneric();
             if (CustomAwaiter.Awaiters.Count == 0)
                 throw new InvalidOperationException("The Awaiters collection is empty");
             foreach (CustomAwaiter customAwaiter in CustomAwaiter.Awaiters)

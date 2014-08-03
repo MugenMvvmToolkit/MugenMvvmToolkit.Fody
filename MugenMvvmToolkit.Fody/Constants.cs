@@ -27,5 +27,9 @@ namespace MugenMvvmToolkit.Fody
         public const string AsyncStateMachineIntefaceFullName = "System.Runtime.CompilerServices.IAsyncStateMachine";
 
         public const string SetStateMachineMethodName = "SetStateMachine";
+
+        public const string MoveNextMethodName = "MoveNext";
+
+        public const string AwaiterName = "$awaiter";
     }
 }

@@ -94,47 +94,133 @@ namespace MugenMvvmToolkit.Fody
             var types = new List<TypeDefinition>();
             CollectAsyncStateMachine(ModuleDefinition.Types, types);
             foreach (var typeDefinition in types)
-                foreach (var methodDefinition in typeDefinition.Methods)
-                    TryUpdateMethod(methodDefinition);
+                TryUpdateStateMachine(typeDefinition);
         }
 
-        private void TryUpdateMethod(MethodDefinition method)
+        private void TryUpdateStateMachine(TypeDefinition type)
         {
-            if (method.Name != Constants.SetStateMachineMethodName || method.Parameters.Count != 1 ||
-                method.Parameters[0].ParameterType.FullName != Constants.AsyncStateMachineIntefaceFullName)
-                return;
-            foreach (var field in method.DeclaringType.Fields.Where(definition => definition.Name.Contains("$awaiter")))
+            FieldDefinition selfField = null;
+            foreach (var method in type.Methods)
             {
-
-                if (field.FieldType.IsValueType)
-                    LogInfo(string.Format("The awaiter field on type '{0}' is a value type '{1}'", method.DeclaringType,
-                        field));
+                if (method.Name == Constants.SetStateMachineMethodName)
+                {
+                    if (method.Parameters.Count != 1 ||
+                        method.Parameters[0].ParameterType.FullName != Constants.AsyncStateMachineIntefaceFullName)
+                        continue;
+                }
                 else
-                    UpdateStateMachine(method, field);
+                {
+                    if (method.Name != Constants.MoveNextMethodName || method.Parameters.Count != 0)
+                        continue;
+                    GenerateSelfField(ref selfField, type);
+                    UpdateMoveNextMethod(method, selfField);
+                    continue;
+                }
+
+                var fields = method.DeclaringType.Fields.ToList();
+                foreach (var field in fields.Where(definition => definition.Name.Contains(Constants.AwaiterName)))
+                {
+                    if (field.FieldType.IsValueType)
+                    {
+                        LogInfo(string.Format("The awaiter field on type '{0}' is a value type '{1}'", method.DeclaringType,
+                            field));
+                        continue;
+                    }
+                    GenerateSelfField(ref selfField, type);
+                    UpdateStateMachineMethod(method, field, selfField);
+                }
             }
         }
 
-        private void UpdateStateMachine(MethodDefinition method, FieldDefinition field)
+        private void UpdateMoveNextMethod(MethodDefinition method, FieldDefinition selfField)
         {
             method.Body.SimplifyMacros();
-            var variable = new VariableDefinition(_asyncStateMachineAwareType);
-            method.Body.Variables.Add(variable);
+            var instructions = method.Body.Instructions;
+            VariableDefinition stateMachineAwareVar = null;
+            for (var index = 0; index < instructions.Count; index++)
+            {
+                var line = instructions[index];
+                if (line.OpCode != OpCodes.Stfld || line.Previous.OpCode == OpCodes.Ldnull)
+                    continue;
+
+
+                var awaiterField = line.Operand as FieldReference;
+                if (awaiterField == null || !awaiterField.Name.Contains(Constants.AwaiterName) ||
+                    awaiterField.FieldType.IsValueType)
+                    continue;
+
+                //NOTE generate this code
+                /*IAsyncStateMachineAware asyncStateMachineAware = this.<>u__$awaiter as IAsyncStateMachineAware;
+	              if (asyncStateMachineAware != null && $_self_ != null)
+	                  asyncStateMachineAware.SetStateMachine(this.$_self_);*/
+                var returnInst = instructions[++index];
+                if (stateMachineAwareVar == null)
+                {
+                    stateMachineAwareVar = new VariableDefinition(_asyncStateMachineAwareType);
+                    method.Body.Variables.Add(stateMachineAwareVar);
+                }
+                instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
+                instructions.Insert(index++, Instruction.Create(OpCodes.Ldfld, awaiterField));
+                instructions.Insert(index++, Instruction.Create(OpCodes.Isinst, _asyncStateMachineAwareType));
+                instructions.Insert(index++, Instruction.Create(OpCodes.Stloc, stateMachineAwareVar));
+                instructions.Insert(index++, Instruction.Create(OpCodes.Ldloc, stateMachineAwareVar));
+                instructions.Insert(index++, Instruction.Create(OpCodes.Brfalse_S, returnInst));
+
+                instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
+                instructions.Insert(index++, Instruction.Create(OpCodes.Ldfld, selfField));
+                instructions.Insert(index++, Instruction.Create(OpCodes.Brfalse_S, returnInst));
+
+                instructions.Insert(index++, Instruction.Create(OpCodes.Ldloc, stateMachineAwareVar));
+                instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
+                instructions.Insert(index++, Instruction.Create(OpCodes.Ldfld, selfField));
+                instructions.Insert(index, Instruction.Create(OpCodes.Callvirt, _setStateMachineMethod));
+            }
+
+            method.Body.OptimizeMacros();
+            LogInfo(string.Format("The '{0}' was updated", method));
+        }
+
+        private void UpdateStateMachineMethod(MethodDefinition method, FieldDefinition field, FieldDefinition selfField)
+        {
+            method.Body.SimplifyMacros();
+            var stateMachineAwareVar = new VariableDefinition(_asyncStateMachineAwareType);
+            method.Body.Variables.Add(stateMachineAwareVar);
             var instructions = method.Body.Instructions;
             var index = instructions.Count - 1;
             var returnInst = instructions[index];
+
+            //NOTE generate this code
+            /*this.$_self_ = param0;*/
+            instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
+            instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_1));
+            instructions.Insert(index++, Instruction.Create(OpCodes.Stfld, selfField));
+
+            //NOTE generate this code
+            /*IAsyncStateMachineAware asyncStateMachineAware = this.<>u__$awaiter as IAsyncStateMachineAware;
+	        if (asyncStateMachineAware != null)
+	            asyncStateMachineAware.SetStateMachine(param0);*/
             instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
             instructions.Insert(index++, Instruction.Create(OpCodes.Ldfld, field));
             instructions.Insert(index++, Instruction.Create(OpCodes.Isinst, _asyncStateMachineAwareType));
-            instructions.Insert(index++, Instruction.Create(OpCodes.Stloc, variable));
-            instructions.Insert(index++, Instruction.Create(OpCodes.Ldloc, variable));
+            instructions.Insert(index++, Instruction.Create(OpCodes.Stloc, stateMachineAwareVar));
+            instructions.Insert(index++, Instruction.Create(OpCodes.Ldloc, stateMachineAwareVar));
             instructions.Insert(index++, Instruction.Create(OpCodes.Brfalse_S, returnInst));
 
-            instructions.Insert(index++, Instruction.Create(OpCodes.Ldloc, variable));
+            instructions.Insert(index++, Instruction.Create(OpCodes.Ldloc, stateMachineAwareVar));
             instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_1));
             instructions.Insert(index, Instruction.Create(OpCodes.Callvirt, _setStateMachineMethod));
 
             method.Body.OptimizeMacros();
             LogInfo(string.Format("AsyncStateMachine {0} was updated", method.DeclaringType.Name));
+        }
+
+        private static void GenerateSelfField(ref FieldDefinition selfField, TypeDefinition type)
+        {
+            if (selfField != null)
+                return;
+            var @interface = type.Interfaces.First(reference => reference.FullName == Constants.AsyncStateMachineIntefaceFullName);
+            selfField = new FieldDefinition("$_self_", FieldAttributes.Private, @interface);
+            type.Fields.Add(selfField);
         }
 
         private static void CollectAsyncStateMachine(IEnumerable<TypeDefinition> typeDefinitions, List<TypeDefinition> types)
