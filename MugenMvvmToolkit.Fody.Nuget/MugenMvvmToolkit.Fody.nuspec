@@ -12,8 +12,6 @@
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <iconUrl>http://vvson.net/Content/img/mugenlogo.png</iconUrl>
     <description>Fody add-in that adds the ability to save the state of asynchronous tasks for WP and WinRT platforms.</description>
-    <summary />
-    <language>en-AU</language>
     <tags>ILWeaving, Fody, Cecil, MugenMvvmToolkit</tags>
     <dependencies>
       <dependency id="Fody"/>
