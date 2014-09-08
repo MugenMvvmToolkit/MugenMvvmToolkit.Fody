@@ -1,4 +1,4 @@
-![MugenMvvmToolkit](https://raw.githubusercontent.com/MugenMvvmToolkit/MugenMvvmToolkit/master/logo_horizontal.png)
+[![MugenMvvmToolkit](https://raw.githubusercontent.com/MugenMvvmToolkit/MugenMvvmToolkit/master/logo_horizontal.png)](https://github.com/MugenMvvmToolkit/MugenMvvmToolkit)
 
 ----------
 ## This is an add-in for [Fody](https://github.com/Fody/Fody/) 
