@@ -22,7 +22,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Vyacheslav Volkov")]
 [assembly: AssemblyProduct("MugenMvvmToolkit.Fody")]
-[assembly: AssemblyCopyright("Copyright © Vyacheslav Volkov 2014")]
+[assembly: AssemblyCopyright("Copyright (c) 2012-2015 Vyacheslav Volkov")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 [assembly: ComVisible(false)]

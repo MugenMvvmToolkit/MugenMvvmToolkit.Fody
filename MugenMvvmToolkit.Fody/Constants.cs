@@ -31,5 +31,7 @@ namespace MugenMvvmToolkit.Fody
         public const string MoveNextMethodName = "MoveNext";
 
         public const string AwaiterName = "$awaiter";
+
+        public const string AwaiterNameNew = "<>u__";
     }
 }
