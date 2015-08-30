@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata minClientVersion="2.8">
     <id>MugenMvvmToolkit.Fody</id>
-    <version>4.2.0</version>
+    <version>4.2.1</version>
     <title>MugenMvvmToolkit.Fody</title>
     <authors>Vyacheslav Volkov</authors>
     <owners>Vyacheslav Volkov</owners>
@@ -16,5 +16,8 @@
     <dependencies>
       <dependency id="Fody"/>
     </dependencies>
+    <releaseNotes>
+      - Updated algorithm to support the VS2015 compiler.      
+    </releaseNotes>
   </metadata>
 </package>

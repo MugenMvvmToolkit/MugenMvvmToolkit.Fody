@@ -113,7 +113,7 @@ namespace MugenMvvmToolkit.Fody
                         if (method.Name != Constants.MoveNextMethodName || method.Parameters.Count != 0)
                             continue;
                         GenerateSelfField(ref selfField, type);
-                        UpdateMoveNextMethodOldCompiler(method, selfField);
+                        UpdateMoveNextMethodOldCompiler(method, type, ref selfField);
                         continue;
                     }
 
@@ -127,7 +127,7 @@ namespace MugenMvvmToolkit.Fody
                             continue;
                         }
                         GenerateSelfField(ref selfField, type);
-                        UpdateStateMachineMethod(method, field, selfField);
+                        UpdateStateMachineMethod(method, field, type, ref selfField);
                     }
                 }
             }
@@ -146,7 +146,7 @@ namespace MugenMvvmToolkit.Fody
                         if (method.Name != Constants.MoveNextMethodName || method.Parameters.Count != 0)
                             continue;
                         GenerateSelfField(ref selfField, type);
-                        UpdateMoveNextMethodNewCompiler(method, selfField);
+                        UpdateMoveNextMethodNewCompiler(method, type, ref selfField);
                         continue;
                     }
 
@@ -160,13 +160,13 @@ namespace MugenMvvmToolkit.Fody
                             continue;
                         }
                         GenerateSelfField(ref selfField, type);
-                        UpdateStateMachineMethod(method, field, selfField);
+                        UpdateStateMachineMethod(method, field, type, ref selfField);
                     }
                 }
             }
         }
 
-        private void UpdateMoveNextMethodNewCompiler(MethodDefinition method, FieldDefinition selfField)
+        private void UpdateMoveNextMethodNewCompiler(MethodDefinition method, TypeDefinition stateMachineType, ref FieldDefinition selfField)
         {
             method.Body.SimplifyMacros();
             var instructions = method.Body.Instructions;
@@ -182,12 +182,24 @@ namespace MugenMvvmToolkit.Fody
                 if (awaiterField == null || !awaiterField.Name.StartsWith(Constants.AwaiterNameNew, StringComparison.OrdinalIgnoreCase) ||
                     awaiterField.FieldType.IsValueType)
                     continue;
-
+                GenerateSelfField(ref selfField, stateMachineType);
                 //NOTE generate this code
                 /*IAsyncStateMachineAware asyncStateMachineAware = this.<>u__$awaiter as IAsyncStateMachineAware;
 	              if (asyncStateMachineAware != null && $_self_ != null)
 	                  asyncStateMachineAware.SetStateMachine(this.$_self_);*/
                 var returnInst = instructions[++index];
+
+                //NOTE generate this code
+                /*this.$_self_ = this;*/
+                instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
+                instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
+                if (stateMachineType.IsValueType)
+                {
+                    instructions.Insert(index++, Instruction.Create(OpCodes.Ldobj, stateMachineType));
+                    instructions.Insert(index++, Instruction.Create(OpCodes.Box, stateMachineType));
+                }
+                instructions.Insert(index++, Instruction.Create(OpCodes.Stfld, selfField));
+
                 if (stateMachineAwareVar == null)
                 {
                     stateMachineAwareVar = new VariableDefinition(_asyncStateMachineAwareType);
@@ -214,8 +226,68 @@ namespace MugenMvvmToolkit.Fody
             LogInfo(string.Format("The '{0}' was updated", method));
         }
 
-        private void UpdateStateMachineMethod(MethodDefinition method, FieldDefinition field, FieldDefinition selfField)
+        private void UpdateMoveNextMethodOldCompiler(MethodDefinition method, TypeDefinition stateMachineType, ref FieldDefinition selfField)
         {
+            method.Body.SimplifyMacros();
+            var instructions = method.Body.Instructions;
+            VariableDefinition stateMachineAwareVar = null;
+            for (var index = 0; index < instructions.Count; index++)
+            {
+                var line = instructions[index];
+                if (line.OpCode != OpCodes.Stfld || line.Previous.OpCode == OpCodes.Ldnull)
+                    continue;
+
+                var awaiterField = line.Operand as FieldReference;
+                if (awaiterField == null || !awaiterField.Name.Contains(Constants.AwaiterName) ||
+                    awaiterField.FieldType.IsValueType)
+                    continue;
+                GenerateSelfField(ref selfField, stateMachineType);
+                //NOTE generate this code
+                /*IAsyncStateMachineAware asyncStateMachineAware = this.<>u__$awaiter as IAsyncStateMachineAware;
+	              if (asyncStateMachineAware != null && $_self_ != null)
+	                  asyncStateMachineAware.SetStateMachine(this.$_self_);*/
+                var returnInst = instructions[++index];
+
+                //NOTE generate this this
+                /*this.$_self_ = param0;*/
+                instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
+                instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
+                if (stateMachineType.IsValueType)
+                {
+                    instructions.Insert(index++, Instruction.Create(OpCodes.Ldobj, stateMachineType));
+                    instructions.Insert(index++, Instruction.Create(OpCodes.Box, stateMachineType));
+                }
+                instructions.Insert(index++, Instruction.Create(OpCodes.Stfld, selfField));
+
+                if (stateMachineAwareVar == null)
+                {
+                    stateMachineAwareVar = new VariableDefinition(_asyncStateMachineAwareType);
+                    method.Body.Variables.Add(stateMachineAwareVar);
+                }
+                instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
+                instructions.Insert(index++, Instruction.Create(OpCodes.Ldfld, awaiterField));
+                instructions.Insert(index++, Instruction.Create(OpCodes.Isinst, _asyncStateMachineAwareType));
+                instructions.Insert(index++, Instruction.Create(OpCodes.Stloc, stateMachineAwareVar));
+                instructions.Insert(index++, Instruction.Create(OpCodes.Ldloc, stateMachineAwareVar));
+                instructions.Insert(index++, Instruction.Create(OpCodes.Brfalse_S, returnInst));
+
+                instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
+                instructions.Insert(index++, Instruction.Create(OpCodes.Ldfld, selfField));
+                instructions.Insert(index++, Instruction.Create(OpCodes.Brfalse_S, returnInst));
+
+                instructions.Insert(index++, Instruction.Create(OpCodes.Ldloc, stateMachineAwareVar));
+                instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
+                instructions.Insert(index++, Instruction.Create(OpCodes.Ldfld, selfField));
+                instructions.Insert(index, Instruction.Create(OpCodes.Callvirt, _setStateMachineMethod));
+            }
+
+            method.Body.OptimizeMacros();
+            LogInfo(string.Format("The '{0}' was updated", method));
+        }
+
+        private void UpdateStateMachineMethod(MethodDefinition method, FieldDefinition field, TypeDefinition stateMachineType, ref FieldDefinition selfField)
+        {
+            GenerateSelfField(ref selfField, stateMachineType);
             method.Body.SimplifyMacros();
             var stateMachineAwareVar = new VariableDefinition(_asyncStateMachineAwareType);
             method.Body.Variables.Add(stateMachineAwareVar);
@@ -246,54 +318,6 @@ namespace MugenMvvmToolkit.Fody
 
             method.Body.OptimizeMacros();
             LogInfo(string.Format("AsyncStateMachine {0} was updated", method.DeclaringType.Name));
-        }
-
-        private void UpdateMoveNextMethodOldCompiler(MethodDefinition method, FieldDefinition selfField)
-        {
-            method.Body.SimplifyMacros();
-            var instructions = method.Body.Instructions;
-            VariableDefinition stateMachineAwareVar = null;
-            for (var index = 0; index < instructions.Count; index++)
-            {
-                var line = instructions[index];
-                if (line.OpCode != OpCodes.Stfld || line.Previous.OpCode == OpCodes.Ldnull)
-                    continue;
-
-
-                var awaiterField = line.Operand as FieldReference;
-                if (awaiterField == null || !awaiterField.Name.Contains(Constants.AwaiterName) ||
-                    awaiterField.FieldType.IsValueType)
-                    continue;
-
-                //NOTE generate this code
-                /*IAsyncStateMachineAware asyncStateMachineAware = this.<>u__$awaiter as IAsyncStateMachineAware;
-	              if (asyncStateMachineAware != null && $_self_ != null)
-	                  asyncStateMachineAware.SetStateMachine(this.$_self_);*/
-                var returnInst = instructions[++index];
-                if (stateMachineAwareVar == null)
-                {
-                    stateMachineAwareVar = new VariableDefinition(_asyncStateMachineAwareType);
-                    method.Body.Variables.Add(stateMachineAwareVar);
-                }
-                instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
-                instructions.Insert(index++, Instruction.Create(OpCodes.Ldfld, awaiterField));
-                instructions.Insert(index++, Instruction.Create(OpCodes.Isinst, _asyncStateMachineAwareType));
-                instructions.Insert(index++, Instruction.Create(OpCodes.Stloc, stateMachineAwareVar));
-                instructions.Insert(index++, Instruction.Create(OpCodes.Ldloc, stateMachineAwareVar));
-                instructions.Insert(index++, Instruction.Create(OpCodes.Brfalse_S, returnInst));
-
-                instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
-                instructions.Insert(index++, Instruction.Create(OpCodes.Ldfld, selfField));
-                instructions.Insert(index++, Instruction.Create(OpCodes.Brfalse_S, returnInst));
-
-                instructions.Insert(index++, Instruction.Create(OpCodes.Ldloc, stateMachineAwareVar));
-                instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
-                instructions.Insert(index++, Instruction.Create(OpCodes.Ldfld, selfField));
-                instructions.Insert(index, Instruction.Create(OpCodes.Callvirt, _setStateMachineMethod));
-            }
-
-            method.Body.OptimizeMacros();
-            LogInfo(string.Format("The '{0}' was updated", method));
         }
 
         private static void GenerateSelfField(ref FieldDefinition selfField, TypeDefinition type)
