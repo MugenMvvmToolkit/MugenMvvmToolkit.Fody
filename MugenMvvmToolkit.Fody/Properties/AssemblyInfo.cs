@@ -18,13 +18,9 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 
 [assembly: AssemblyTitle("MugenMvvmToolkit.Fody")]
-[assembly: AssemblyDescription("")]
-[assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("Vyacheslav Volkov")]
 [assembly: AssemblyProduct("MugenMvvmToolkit.Fody")]
 [assembly: AssemblyCopyright("Copyright (c) 2012-2015 Vyacheslav Volkov")]
-[assembly: AssemblyTrademark("")]
-[assembly: AssemblyCulture("")]
 [assembly: ComVisible(false)]
 [assembly: Guid("5e658639-7b49-4d2e-a12d-12e5af145ebc")]
 [assembly: AssemblyVersion("1.0.0")]
