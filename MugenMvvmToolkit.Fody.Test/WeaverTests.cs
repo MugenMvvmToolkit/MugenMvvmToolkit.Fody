@@ -14,8 +14,6 @@ namespace MugenMvvmToolkit.Fody.Test
         #region Fields
 
         private Assembly _assembly;
-        private string _assemblyPath;
-        private string _newAssemblyPath;
 
         #endregion
 
@@ -27,27 +25,31 @@ namespace MugenMvvmToolkit.Fody.Test
             string projectPath =
                 Path.GetFullPath(Path.Combine(Environment.CurrentDirectory,
                     @"..\..\..\MugenMvvmToolkit.Fody.TestAssembly\MugenMvvmToolkit.Fody.TestAssembly.csproj"));
-            _assemblyPath = Path.Combine(Path.GetDirectoryName(projectPath),
+            var assemblyPath = Path.Combine(Path.GetDirectoryName(projectPath),
                 @"bin\Debug\MugenMvvmToolkit.Fody.TestAssembly.dll");
 #if !DEBUG
-            _assemblyPath = _assemblyPath.Replace("Debug", "Release");
+            assemblyPath = assemblyPath.Replace("Debug", "Release");
 #endif
-            _newAssemblyPath = _assemblyPath.Replace(".dll", "2.dll");
-            File.Copy(_assemblyPath, _newAssemblyPath, true);
+            var newAssemblyPath = assemblyPath.Replace(".dll", "2.dll");
+            File.Copy(assemblyPath, newAssemblyPath, true);
 
-            ModuleDefinition moduleDefinition = ModuleDefinition.ReadModule(_newAssemblyPath);
-            var weavingTask = new ModuleWeaver
+            using (ModuleDefinition moduleDefinition = ModuleDefinition.ReadModule(newAssemblyPath))
             {
-                ModuleDefinition = moduleDefinition,
-                AssemblyResolver = new DefaultAssemblyResolver(),
-                LogInfo = s => Console.WriteLine(s),
-                LogWarning = s => Console.WriteLine(s)
-            };
+                var weavingTask = new ModuleWeaver
+                {
+                    ModuleDefinition = moduleDefinition,
+                    AssemblyResolver = new DefaultAssemblyResolver(),
+                    LogInfo = s => Console.WriteLine(s),
+                    LogWarning = s => Console.WriteLine(s)
+                };
 
-            weavingTask.Execute();
-            moduleDefinition.Write(_newAssemblyPath);
+                weavingTask.Execute();
 
-            _assembly = Assembly.LoadFile(_newAssemblyPath);
+                newAssemblyPath = assemblyPath.Replace(".dll", "3.dll");
+                moduleDefinition.Write(newAssemblyPath);
+            }
+
+            _assembly = Assembly.LoadFile(newAssemblyPath);
         }
 
         [TestMethod]

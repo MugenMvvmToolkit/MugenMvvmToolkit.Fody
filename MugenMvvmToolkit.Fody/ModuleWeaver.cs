@@ -58,35 +58,34 @@ namespace MugenMvvmToolkit.Fody
 
         public void Execute()
         {
-            var definition = AssemblyResolver.Resolve(Constants.MugenMvvmToolkitAssemblyName);
+            var definition = AssemblyResolver.Resolve(new AssemblyNameReference(Constants.MugenMvvmToolkitAssemblyName, new Version()));
             if (definition == null)
             {
-                LogWarning(string.Format("The {0} is not referenced to a project {1}",
-                    Constants.MugenMvvmToolkitAssemblyName, ModuleDefinition.Name));
+                LogWarning($"The {Constants.MugenMvvmToolkitAssemblyName} is not referenced to a project {ModuleDefinition.Name}");
                 return;
             }
             TypeReference type = definition.MainModule.Types.FirstOrDefault(typeDefinition => typeDefinition.FullName == Constants.AsyncStateMachineAwareFullName);
             if (type == null)
             {
-                LogWarning(string.Format("The type {0} was not found", Constants.AsyncStateMachineAwareFullName));
+                LogWarning($"The type {Constants.AsyncStateMachineAwareFullName} was not found");
                 return;
             }
             var resolveType = type.Resolve();
             if (resolveType == null)
             {
-                LogWarning(string.Format("The type {0} was not found", Constants.AsyncStateMachineAwareFullName));
+                LogWarning($"The type {Constants.AsyncStateMachineAwareFullName} was not found");
                 return;
             }
-            _asyncStateMachineAwareType = ModuleDefinition.Import(type);
+            _asyncStateMachineAwareType = ModuleDefinition.ImportReference(type);
             var setStateMachineMethod = resolveType.Methods
                 .FirstOrDefault(method => method.Name == Constants.SetStateMachineMethodName && method.Parameters.Count == 1 &&
                           method.Parameters[0].ParameterType.FullName == Constants.AsyncStateMachineIntefaceFullName);
             if (setStateMachineMethod == null)
             {
-                LogWarning(string.Format("The method {0} was not found", Constants.SetStateMachineMethodName));
+                LogWarning($"The method {Constants.SetStateMachineMethodName} was not found");
                 return;
             }
-            _setStateMachineMethod = ModuleDefinition.Import(setStateMachineMethod);
+            _setStateMachineMethod = ModuleDefinition.ImportReference(setStateMachineMethod);
 
             var types = new List<TypeDefinition>();
             CollectAsyncStateMachine(ModuleDefinition.Types, types);
@@ -122,8 +121,7 @@ namespace MugenMvvmToolkit.Fody
                     {
                         if (field.FieldType.IsValueType)
                         {
-                            LogInfo(string.Format("The awaiter field on type '{0}' is a value type '{1}'",
-                                method.DeclaringType, field));
+                            LogInfo($"The awaiter field on type '{method.DeclaringType}' is a value type '{field}'");
                             continue;
                         }
                         GenerateSelfField(ref selfField, type);
@@ -155,8 +153,7 @@ namespace MugenMvvmToolkit.Fody
                     {
                         if (field.FieldType.IsValueType)
                         {
-                            LogInfo(string.Format("The awaiter field on type '{0}' is a value type '{1}'",
-                                method.DeclaringType, field));
+                            LogInfo($"The awaiter field on type '{method.DeclaringType}' is a value type '{field}'");
                             continue;
                         }
                         GenerateSelfField(ref selfField, type);
@@ -185,12 +182,12 @@ namespace MugenMvvmToolkit.Fody
                 GenerateSelfField(ref selfField, stateMachineType);
                 //NOTE generate this code
                 /*IAsyncStateMachineAware asyncStateMachineAware = this.<>u__$awaiter as IAsyncStateMachineAware;
-	              if (asyncStateMachineAware != null && $_self_ != null)
-	                  asyncStateMachineAware.SetStateMachine(this.$_self_);*/
+	              if (asyncStateMachineAware != null && _self_ != null)
+	                  asyncStateMachineAware.SetStateMachine(this._self_);*/
                 var returnInst = instructions[++index];
 
                 //NOTE generate this code
-                /*this.$_self_ = this;*/
+                /*this._self_ = this;*/
                 instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
                 instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
                 if (stateMachineType.IsValueType)
@@ -223,7 +220,7 @@ namespace MugenMvvmToolkit.Fody
             }
 
             method.Body.OptimizeMacros();
-            LogInfo(string.Format("The '{0}' was updated", method));
+            LogInfo($"The '{method}' was updated");
         }
 
         private void UpdateMoveNextMethodOldCompiler(MethodDefinition method, TypeDefinition stateMachineType, ref FieldDefinition selfField)
@@ -244,12 +241,12 @@ namespace MugenMvvmToolkit.Fody
                 GenerateSelfField(ref selfField, stateMachineType);
                 //NOTE generate this code
                 /*IAsyncStateMachineAware asyncStateMachineAware = this.<>u__$awaiter as IAsyncStateMachineAware;
-	              if (asyncStateMachineAware != null && $_self_ != null)
-	                  asyncStateMachineAware.SetStateMachine(this.$_self_);*/
+	              if (asyncStateMachineAware != null && _self_ != null)
+	                  asyncStateMachineAware.SetStateMachine(this._self_);*/
                 var returnInst = instructions[++index];
 
                 //NOTE generate this this
-                /*this.$_self_ = param0;*/
+                /*this._self_ = param0;*/
                 instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
                 instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
                 if (stateMachineType.IsValueType)
@@ -282,7 +279,7 @@ namespace MugenMvvmToolkit.Fody
             }
 
             method.Body.OptimizeMacros();
-            LogInfo(string.Format("The '{0}' was updated", method));
+            LogInfo($"The '{method}' was updated");
         }
 
         private void UpdateStateMachineMethod(MethodDefinition method, FieldDefinition field, TypeDefinition stateMachineType, ref FieldDefinition selfField)
@@ -296,7 +293,7 @@ namespace MugenMvvmToolkit.Fody
             var returnInst = instructions[index];
 
             //NOTE generate this code
-            /*this.$_self_ = param0;*/
+            /*this._self_ = param0;*/
             instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_0));
             instructions.Insert(index++, Instruction.Create(OpCodes.Ldarg_1));
             instructions.Insert(index++, Instruction.Create(OpCodes.Stfld, selfField));
@@ -317,15 +314,15 @@ namespace MugenMvvmToolkit.Fody
             instructions.Insert(index, Instruction.Create(OpCodes.Callvirt, _setStateMachineMethod));
 
             method.Body.OptimizeMacros();
-            LogInfo(string.Format("AsyncStateMachine {0} was updated", method.DeclaringType.Name));
+            LogInfo($"AsyncStateMachine {method.DeclaringType.Name} was updated");
         }
 
         private static void GenerateSelfField(ref FieldDefinition selfField, TypeDefinition type)
         {
             if (selfField != null)
                 return;
-            var @interface = type.Interfaces.First(reference => reference.FullName == Constants.AsyncStateMachineIntefaceFullName);
-            selfField = new FieldDefinition("$_self_", FieldAttributes.Private, @interface);
+            var @interface = type.Interfaces.First(reference => reference.InterfaceType.FullName == Constants.AsyncStateMachineIntefaceFullName);
+            selfField = new FieldDefinition("_self_", FieldAttributes.Public, @interface.InterfaceType);
             type.Fields.Add(selfField);
         }
 

@@ -34,12 +34,12 @@ namespace MugenMvvmToolkit.Fody
         {
             return typeDefinition
                 .CustomAttributes
-                .Any(x => x.Constructor.DeclaringType.FullName == typeof (CompilerGeneratedAttribute).FullName);
+                .Any(x => x.Constructor.DeclaringType.FullName == typeof(CompilerGeneratedAttribute).FullName);
         }
 
         private static bool HasAsyncStateMachineInterface(this TypeDefinition typeDefinition)
         {
-            return typeDefinition.Interfaces.Any(x => x.FullName == Constants.AsyncStateMachineIntefaceFullName);
+            return typeDefinition.Interfaces.Any(x => x.InterfaceType.FullName == Constants.AsyncStateMachineIntefaceFullName);
         }
 
         #endregion
