@@ -3,7 +3,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using MugenMvvmToolkit.Infrastructure.Callbacks;
 using MugenMvvmToolkit.Interfaces.Callbacks;
-using MugenMvvmToolkit.Utils;
 
 namespace MugenMvvmToolkit.Fody.TestAssembly
 {
@@ -13,7 +12,7 @@ namespace MugenMvvmToolkit.Fody.TestAssembly
 
         static TestClass()
         {
-            ServiceProvider.AsyncOperationAwaiterFactory = new CustomAsyncOperationAwaiterFactory();
+            ServiceProvider.OperationCallbackFactory = new CustomAsyncOperationAwaiterFactory();
         }
 
         #endregion
@@ -64,7 +63,7 @@ namespace MugenMvvmToolkit.Fody.TestAssembly
 
         private async Task DoubleAsyncMugenAwaiterMethod()
         {
-            var b = await new Func<bool>(() => true) || await MvvmUtils.TrueTaskResult;
+            var b = await new Func<bool>(() => true) || await Empty.TrueTask;
             if (b)
             {
                 IAsyncOperation<bool> operation1 = new AsyncOperation<bool>();
@@ -77,7 +76,7 @@ namespace MugenMvvmToolkit.Fody.TestAssembly
 
         private async Task<bool> DoubleAsyncMugenAwaiterMethodGeneric()
         {
-            var b = await new Func<bool>(() => true) || await MvvmUtils.TrueTaskResult;
+            var b = await new Func<bool>(() => true) || await Empty.TrueTask;
             bool result = false;
             if (b)
             {
