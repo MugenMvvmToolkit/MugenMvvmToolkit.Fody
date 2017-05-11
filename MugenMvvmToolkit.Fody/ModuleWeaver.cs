@@ -96,7 +96,7 @@ namespace MugenMvvmToolkit.Fody
         private void TryUpdateStateMachine(TypeDefinition type)
         {
             FieldDefinition selfField = null;
-            //Old compiler name awaiter name is $awaiter
+            //Old compiler awaiter name name is $awaiter            
             if (type.Fields.Any(definition => definition.Name.Contains(Constants.AwaiterName)))
             {
                 foreach (var method in type.Methods)
@@ -116,14 +116,16 @@ namespace MugenMvvmToolkit.Fody
                         continue;
                     }
 
-                    var fields = method.DeclaringType.Fields.ToList();
-                    foreach (var field in fields.Where(definition => definition.Name.Contains(Constants.AwaiterName)))
+                    var fields = method.DeclaringType.Fields.Where(definition => definition.Name.Contains(Constants.AwaiterName)).ToList();
+                    foreach (var field in fields)
                     {
                         if (field.FieldType.IsValueType)
                         {
                             LogInfo($"The awaiter field on type '{method.DeclaringType}' is a value type '{field}'");
                             continue;
                         }
+                        //need to make it public in order to use with xamarin
+                        field.Attributes = FieldAttributes.Public;
                         GenerateSelfField(ref selfField, type);
                         UpdateStateMachineMethod(method, field, type, ref selfField);
                     }
@@ -148,14 +150,16 @@ namespace MugenMvvmToolkit.Fody
                         continue;
                     }
 
-                    var fields = method.DeclaringType.Fields.ToList();
-                    foreach (var field in fields.Where(definition => definition.Name.StartsWith(Constants.AwaiterNameNew, StringComparison.OrdinalIgnoreCase)))
+                    var fields = method.DeclaringType.Fields.Where(definition => definition.Name.StartsWith(Constants.AwaiterNameNew, StringComparison.OrdinalIgnoreCase)).ToList();
+                    foreach (var field in fields)
                     {
                         if (field.FieldType.IsValueType)
                         {
                             LogInfo($"The awaiter field on type '{method.DeclaringType}' is a value type '{field}'");
                             continue;
                         }
+                        //need to make it public in order to use with xamarin
+                        field.Attributes = FieldAttributes.Public;
                         GenerateSelfField(ref selfField, type);
                         UpdateStateMachineMethod(method, field, type, ref selfField);
                     }
